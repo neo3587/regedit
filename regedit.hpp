@@ -26,8 +26,10 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include <algorithm>
 #include <cctype>
 #include <windows.h>
+
 
 
 
@@ -39,7 +41,6 @@ namespace neo {
 		class iter {
 
 			protected:
-			public:
 
 				HKEY _hkey = NULL;
 				DWORD _pos = 0;
@@ -233,7 +234,7 @@ namespace neo {
 
 	class regedit {
 
-		protected:
+		private:
 
 			HKEY _hkey = NULL;
 			DWORD _mode = KEY_READ | KEY_WRITE;
@@ -263,7 +264,7 @@ namespace neo {
 
 				return endp;
 			}
-
+			
 			struct _gen_fn {
 				std::pair<std::string, regedit> operator()(HKEY hk, DWORD pos) const {
 					char buff[255];
@@ -272,6 +273,14 @@ namespace neo {
 					return { buff, regedit(hk, buff) };
 				}
 			};
+
+			#ifndef _MSC_VER
+			static LONG RegDeleteTreeA(HKEY hk, LPCSTR pcstr) {
+				typedef LONG(*_DLLRegDeleteTreeA)(HKEY, LPCSTR);
+				static _DLLRegDeleteTreeA rgtafn = (_DLLRegDeleteTreeA)GetProcAddress(GetModuleHandleA("Advapi32.dll"), "RegDeleteTreeA");
+				return rgtafn(hk, pcstr);
+			}
+			#endif
 
 		public:
 
@@ -457,7 +466,7 @@ namespace neo {
 
 						return endp;
 					}
-
+					
 					struct _gen_fn {
 						std::pair<std::string, value> operator()(HKEY hk, DWORD pos) const {
 							char buff[16383];
@@ -556,7 +565,7 @@ namespace neo {
 
 					value at(const std::string& val) {
 						if(RegQueryValueExA(_hkey, val.c_str(), NULL, NULL, NULL, NULL) != ERROR_SUCCESS)
-							throw std::out_of_range("neo::rgdt::values::at(): value doesn't exists");
+							throw std::out_of_range("neo::regedit::values::at(): value doesn't exists");
 						return value(_hkey, val.c_str());
 					}
 					const value at(const std::string& val) const {
@@ -607,8 +616,8 @@ namespace neo {
 
 					iterator erase(const_iterator pos) {
 						if(RegDeleteValueA(_hkey, pos->first.c_str()) != ERROR_SUCCESS)
-							throw std::logic_error("neo::rgdt::values::erase(): trying to delete a value from an unvalid key");
-						return iterator(_hkey, min(pos._pos, static_cast<DWORD>(size())));
+							throw std::logic_error("neo::regedit::values::erase(): trying to delete a value from an unvalid key");
+						return iterator(_hkey, (std::min)(pos._pos, static_cast<DWORD>(size())));
 					}
 					size_t erase(const std::string& val) {
 						const_iterator it = find(val);
@@ -718,7 +727,7 @@ namespace neo {
 			regedit at(const std::string& key) {
 				regedit tmp(_hkey, key);
 				if(!tmp.is_open())
-					throw std::out_of_range("neo::rgdt::at() key doesn't exists");
+					throw std::out_of_range("neo::regedit::at() key doesn't exists");
 				return std::move(tmp);
 			}
 			const regedit at(const std::string& key) const {
@@ -728,7 +737,7 @@ namespace neo {
 				HKEY hk;
 				DWORD disp;
 				if(RegCreateKeyExA(_hkey, key.c_str(), 0, NULL, REG_OPTION_NON_VOLATILE, _mode, NULL, &hk, &disp) != ERROR_SUCCESS)
-					throw std::logic_error("neo::rgdt::operator[](): trying to open or create a subkey to an unvalid key");
+					throw std::logic_error("neo::regedit::operator[](): trying to open or create a subkey to an unvalid key");
 				return regedit(hk);
 			}
 			const regedit operator[](const std::string& key) const {
@@ -762,7 +771,7 @@ namespace neo {
 				HKEY hk;
 				DWORD disp;
 				if(RegCreateKeyExA(_hkey, key.c_str(), 0, NULL, REG_OPTION_NON_VOLATILE, _mode, NULL, &hk, &disp) != ERROR_SUCCESS)
-					throw std::logic_error("neo::rgdt::insert(): trying to insert a subkey to an unvalid key");
+					throw std::logic_error("neo::regedit::insert(): trying to insert a subkey to an unvalid key");
 				return { find(key), (disp == REG_CREATED_NEW_KEY) };
 			}
 			template<class InputIterator, typename = typename std::enable_if<std::is_convertible<decltype(*InputIterator()), std::string>::value>::type>
@@ -776,7 +785,7 @@ namespace neo {
 
 			iterator erase(const_iterator pos) {
 				if(RegDeleteTreeA(_hkey, pos->first.c_str()) != ERROR_SUCCESS)
-					throw std::logic_error("neo::rgdt::erase(): trying to delete a subkey from an unvalid key");
+					throw std::logic_error("neo::regedit::erase(): trying to delete a subkey from an unvalid key");
 				return iterator(_hkey, pos._pos == 0 ? 0 : pos._pos - 1);
 			}
 			size_t erase(const std::string& key) {
