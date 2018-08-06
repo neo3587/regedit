@@ -264,7 +264,12 @@ namespace neo {
 
 				return endp;
 			}
-			
+			std::string _pos_str(size_t pos) const {
+				char buff[255];
+				DWORD blen = 255;
+				return RegEnumKeyExA(_hkey, static_cast<DWORD>(pos), buff, &blen, NULL, NULL, NULL, NULL) == ERROR_SUCCESS ? buff : "";
+			}
+
 			struct _gen_fn {
 				std::pair<std::string, regedit> operator()(HKEY hk, DWORD pos) const {
 					char buff[255];
@@ -449,9 +454,9 @@ namespace neo {
 
 						right = endp;
 						if(left != right) {
-							char buff[255];
+							char buff[16384];
 							while(left <= right) {
-								DWORD blen = 255, pos = (left + right) >> 1;
+								DWORD blen = 16384, pos = (left + right) >> 1;
 								if(RegEnumValueA(_hkey, pos, buff, &blen, NULL, NULL, NULL, NULL) != ERROR_SUCCESS)
 									return endp;
 								int cmp = __regedit_details::_lcase_cmp(str, buff);
@@ -466,7 +471,12 @@ namespace neo {
 
 						return endp;
 					}
-					
+					std::string _pos_str(size_t pos) const {
+						char buff[16384];
+						DWORD blen = 16384;
+						return RegEnumValueA(_hkey, static_cast<DWORD>(pos), buff, &blen, NULL, NULL, NULL, NULL) == ERROR_SUCCESS ? buff : "";
+					}
+
 					struct _gen_fn {
 						std::pair<std::string, value> operator()(HKEY hk, DWORD pos) const {
 							char buff[16383];
@@ -582,6 +592,35 @@ namespace neo {
 					}
 					const value operator[](const std::string& val) const {
 						return const_cast<values&>(*this).operator[](val);
+					}
+
+					std::pair<std::string, value> at(size_t pos) {
+						std::string val = _pos_str(pos);
+						if(RegQueryValueExA(_hkey, val.c_str(), NULL, NULL, NULL, NULL) != ERROR_SUCCESS)
+							throw std::out_of_range("neo::regedit::values::at(): value doesn't exists");
+						std::pair<std::string, value> ret;
+						ret.second = value(_hkey, val.c_str());
+						ret.first = std::move(val);
+						return std::move(ret);
+					}
+					const std::pair<std::string, value> at(size_t pos) const {
+						return const_cast<values&>(*this).at(pos);
+					}
+					std::pair<std::string, value> operator[](size_t pos) {
+						try {
+							return at(pos);
+						}
+						catch(...) {
+							std::string val = _pos_str(pos);
+							RegSetValueExA(_hkey, val.c_str(), 0, REG_NONE, NULL, 0);
+							std::pair<std::string, value> ret;
+							ret.second = value(_hkey, val.c_str());
+							ret.first = std::move(val);
+							return std::move(ret);
+						}
+					}
+					const std::pair<std::string, value> operator[](size_t pos) const {
+						return const_cast<values&>(*this).operator[](pos);
 					}
 
 					// Capacity:
@@ -742,6 +781,28 @@ namespace neo {
 			}
 			const regedit operator[](const std::string& key) const {
 				return const_cast<regedit&>(*this).operator[](key);
+			}
+
+			std::pair<std::string, regedit> at(size_t pos) {
+				std::string key = _pos_str(pos);
+				regedit tmp(_hkey, key);
+				if(!tmp.is_open())
+					throw std::out_of_range("neo::regedit::at() key doesn't exists");
+				return { std::move(key), std::move(tmp) };
+			}
+			const std::pair<std::string, regedit> at(size_t pos) const {
+				return const_cast<regedit&>(*this).at(pos);
+			}
+			std::pair<std::string, regedit> operator[](size_t pos) {
+				HKEY hk;
+				DWORD disp;
+				std::string key = _pos_str(pos);
+				if(RegCreateKeyExA(_hkey, key.c_str(), 0, NULL, REG_OPTION_NON_VOLATILE, _mode, NULL, &hk, &disp) != ERROR_SUCCESS)
+					throw std::logic_error("neo::regedit::operator[](): trying to open or create a subkey to an unvalid key");
+				return { std::move(key), regedit(hk) };
+			}
+			const std::pair<std::string, regedit> operator[](size_t pos) const {
+				return const_cast<regedit&>(*this).operator[](pos);
 			}
 
 			// Capacity:
