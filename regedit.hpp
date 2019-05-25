@@ -120,38 +120,38 @@ namespace neo {
 		};
 
 		enum class type : DWORD {
-			none						= REG_NONE,
-			sz							= REG_SZ,
-			expand_sz					= REG_EXPAND_SZ,
-			binary						= REG_BINARY,
-			dword						= REG_DWORD,
-			dword_little_endian			= REG_DWORD_LITTLE_ENDIAN,
-			dword_big_endian			= REG_DWORD_BIG_ENDIAN,
-			link						= REG_LINK,
-			multi_sz					= REG_MULTI_SZ,
-			resource_list				= REG_RESOURCE_LIST,
-			full_resource_descriptor	= REG_FULL_RESOURCE_DESCRIPTOR,
-			resource_requirements_list	= REG_RESOURCE_REQUIREMENTS_LIST,
-			qword						= REG_QWORD,
-			qword_little_endian			= REG_QWORD_LITTLE_ENDIAN
+			none                       = REG_NONE,
+			sz                         = REG_SZ,
+			expand_sz                  = REG_EXPAND_SZ,
+			binary                     = REG_BINARY,
+			dword                      = REG_DWORD,
+			dword_little_endian        = REG_DWORD_LITTLE_ENDIAN,
+			dword_big_endian           = REG_DWORD_BIG_ENDIAN,
+			link                       = REG_LINK,
+			multi_sz                   = REG_MULTI_SZ,
+			resource_list              = REG_RESOURCE_LIST,
+			full_resource_descriptor   = REG_FULL_RESOURCE_DESCRIPTOR,
+			resource_requirements_list = REG_RESOURCE_REQUIREMENTS_LIST,
+			qword                      = REG_QWORD,
+			qword_little_endian        = REG_QWORD_LITTLE_ENDIAN
 		};
 
 		namespace read_overload { // GCC needs all this instead just a simple 'auto' return
 
 			template<type T>
 			using _return_t =
-				typename std::conditional<T == type::none,							void*,
-				typename std::conditional<T == type::sz,							std::string,
-				typename std::conditional<T == type::expand_sz,						std::string,
-				typename std::conditional<T == type::binary,						std::unique_ptr<BYTE>,
-				typename std::conditional<T == type::dword,							DWORD,
-				typename std::conditional<T == type::dword_big_endian,				DWORD,
-				typename std::conditional<T == type::link,							std::wstring,
-				typename std::conditional<T == type::multi_sz,						std::vector<std::string>,
-				typename std::conditional<T == type::resource_list,					std::unique_ptr<BYTE>,
-				typename std::conditional<T == type::full_resource_descriptor,		std::unique_ptr<BYTE>,
-				typename std::conditional<T == type::resource_requirements_list,	std::unique_ptr<BYTE>,
-				typename std::conditional<T == type::qword,							DWORD64,
+				typename std::conditional<T == type::none,                       void*,
+				typename std::conditional<T == type::sz,                         std::string,
+				typename std::conditional<T == type::expand_sz,                  std::string,
+				typename std::conditional<T == type::binary,                     std::unique_ptr<BYTE>,
+				typename std::conditional<T == type::dword,                      DWORD,
+				typename std::conditional<T == type::dword_big_endian,           DWORD,
+				typename std::conditional<T == type::link,                       std::wstring,
+				typename std::conditional<T == type::multi_sz,                   std::vector<std::string>,
+				typename std::conditional<T == type::resource_list,              std::unique_ptr<BYTE>,
+				typename std::conditional<T == type::full_resource_descriptor,   std::unique_ptr<BYTE>,
+				typename std::conditional<T == type::resource_requirements_list, std::unique_ptr<BYTE>,
+				typename std::conditional<T == type::qword,                      DWORD64,
 				std::nullptr_t>::type>::type>::type>::type>::type>::type>::type>::type>::type>::type>::type>::type;
 
 			std::unique_ptr<BYTE> read(HKEY hk, const std::string& name) {
@@ -163,34 +163,34 @@ namespace neo {
 			}
 
 			template<type T> _return_t<T> read(HKEY hk, const std::string& name);
-			template<> _return_t<type::none>						/* void*					*/ read<type::none>(HKEY hk, const std::string& name) {
+			template<> _return_t<type::none>                       /* void*                    */ read<type::none>(HKEY hk, const std::string& name) {
 				return static_cast<void*>(nullptr);
 			}
-			template<> _return_t<type::sz>							/* std::string				*/ read<type::sz>(HKEY hk, const std::string& name) {
+			template<> _return_t<type::sz>                         /* std::string              */ read<type::sz>(HKEY hk, const std::string& name) {
 				return std::string(reinterpret_cast<const char*>(read(hk, name).get()));
 			}
-			template<> _return_t<type::expand_sz>					/* std::string				*/ read<type::expand_sz>(HKEY hk, const std::string& name) {
+			template<> _return_t<type::expand_sz>                  /* std::string              */ read<type::expand_sz>(HKEY hk, const std::string& name) {
 				std::string str = read<type::sz>(hk, name);
 				DWORD size = ExpandEnvironmentStringsA(str.c_str(), NULL, 0);
 				std::unique_ptr<char> exp(new char[size]);
 				ExpandEnvironmentStringsA(str.c_str(), exp.get(), size);
 				return std::string(exp.get());
 			}
-			template<> _return_t<type::binary>						/* std::unique_ptr<BYTE>	*/ read<type::binary>(HKEY hk, const std::string& name) {
+			template<> _return_t<type::binary>                     /* std::unique_ptr<BYTE>    */ read<type::binary>(HKEY hk, const std::string& name) {
 				return read(hk, name);
 			}
-			template<> _return_t<type::dword>						/* DWORD					*/ read<type::dword>(HKEY hk, const std::string& name) {
+			template<> _return_t<type::dword>                      /* DWORD                    */ read<type::dword>(HKEY hk, const std::string& name) {
 				return *reinterpret_cast<DWORD*>(read(hk, name).get());
 			}
-			template<> _return_t<type::dword_big_endian>			/* DWORD					*/ read<type::dword_big_endian>(HKEY hk, const std::string& name) {
+			template<> _return_t<type::dword_big_endian>           /* DWORD                    */ read<type::dword_big_endian>(HKEY hk, const std::string& name) {
 				return read<type::dword>(hk, name);
 				//std::unique_ptr<BYTE> pt = read<type::binary>();
 				//return DWORD((pt.get()[0] << 24) | (pt.get()[1] << 16) | (pt.get()[2] << 16) | (pt.get()[3] << 0));
 			}
-			template<> _return_t<type::link>						/* std::wstring				*/ read<type::link>(HKEY hk, const std::string& name) {
+			template<> _return_t<type::link>                       /* std::wstring             */ read<type::link>(HKEY hk, const std::string& name) {
 				return std::wstring(reinterpret_cast<const wchar_t*>(read(hk, name).get()));
 			}
-			template<> _return_t<type::multi_sz>					/* std::vector<std::string>	*/ read<type::multi_sz>(HKEY hk, const std::string& name) {
+			template<> _return_t<type::multi_sz>                   /* std::vector<std::string> */ read<type::multi_sz>(HKEY hk, const std::string& name) {
 				DWORD ty = 0, len = 0, off = 0;
 				RegQueryValueExA(hk, name.c_str(), NULL, NULL, NULL, &len);
 				std::unique_ptr<BYTE> ptr; (new BYTE[len]);
@@ -203,30 +203,30 @@ namespace neo {
 				}
 				return std::move(vec);
 			}
-			template<> _return_t<type::resource_list>				/* std::unique_ptr<BYTE>	*/ read<type::resource_list>(HKEY hk, const std::string& name) {
+			template<> _return_t<type::resource_list>              /* std::unique_ptr<BYTE>    */ read<type::resource_list>(HKEY hk, const std::string& name) {
 				return read(hk, name);
 			}
-			template<> _return_t<type::full_resource_descriptor>	/* std::unique_ptr<BYTE>	*/ read<type::full_resource_descriptor>(HKEY hk, const std::string& name) {
+			template<> _return_t<type::full_resource_descriptor>   /* std::unique_ptr<BYTE>    */ read<type::full_resource_descriptor>(HKEY hk, const std::string& name) {
 				return read(hk, name);
 			}
-			template<> _return_t<type::resource_requirements_list>	/* std::unique_ptr<BYTE>	*/ read<type::resource_requirements_list>(HKEY hk, const std::string& name) {
+			template<> _return_t<type::resource_requirements_list> /* std::unique_ptr<BYTE>    */ read<type::resource_requirements_list>(HKEY hk, const std::string& name) {
 				return read(hk, name);
 			}
-			template<> _return_t<type::qword>						/* DWORD64					*/ read<type::qword>(HKEY hk, const std::string& name) {
+			template<> _return_t<type::qword>                      /* DWORD64                  */ read<type::qword>(HKEY hk, const std::string& name) {
 				return *reinterpret_cast<DWORD64*>(read(hk, name).get());
 			}
 		}
 
 		inline int _lcase_cmp(const char* s1, const char* s2) {
-		    #ifdef _MSC_VER
+			#ifdef _MSC_VER
 			return _stricmp(s1, s2);
 			#else // GCC having some linker problems even with strcasecmp (at least at my end)
 			const char *p1 = s1, *p2 = s2;
-            int result = 0;
-            do {
-                result = tolower(*p1) - tolower(*p2);
-            } while(*p1++ != '\0' && *p2++ != '\0' && result == 0);
-            return (std::min)(1, (std::max)(-1, result));
+			int result = 0;
+			do {
+				result = tolower(*p1) - tolower(*p2);
+			} while(*p1++ != '\0' && *p2++ != '\0' && result == 0);
+			return (std::min)(1, (std::max)(-1, result));
 			#endif
 		}
 
@@ -319,8 +319,8 @@ namespace neo {
 					friend regedit;
 					friend __regedit_details::iter<regedit, const_iterator, iterator, _gen_fn>;
 			};
-			using reverse_iterator			= std::reverse_iterator<iterator>;
-			using const_reverse_iterator	= std::reverse_iterator<const_iterator>;
+			using reverse_iterator       = std::reverse_iterator<iterator>;
+			using const_reverse_iterator = std::reverse_iterator<const_iterator>;
 
 			struct hkey {
 				static const HKEY classes_root;
@@ -891,29 +891,29 @@ namespace neo {
 
 			static const char* type_to_string(type ty) {
 				switch(ty) {
-					case type::none:						return "none";
-					case type::sz:							return "sz";
-					case type::expand_sz:					return "expand_sz";
-					case type::binary:						return "binary";
-					case type::dword:						return "dword";
-					case type::dword_big_endian:			return "dword_big_endian";
-					case type::link:						return "link";
-					case type::multi_sz:					return "multi_sz";
-					case type::resource_list:				return "resource_list";
-					case type::full_resource_descriptor:	return "full_resource_descriptor";
-					case type::resource_requirements_list:	return "resource_requirements_list";
-					case type::qword:						return "qword";
+					case type::none:                        return "none";
+					case type::sz:                          return "sz";
+					case type::expand_sz:                   return "expand_sz";
+					case type::binary:                      return "binary";
+					case type::dword:                       return "dword";
+					case type::dword_big_endian:            return "dword_big_endian";
+					case type::link:                        return "link";
+					case type::multi_sz:                    return "multi_sz";
+					case type::resource_list:               return "resource_list";
+					case type::full_resource_descriptor:    return "full_resource_descriptor";
+					case type::resource_requirements_list:  return "resource_requirements_list";
+					case type::qword:                       return "qword";
 				}
 				return "unknown";
 			}
 
 	};
 
-	const HKEY regedit::hkey::classes_root		= HKEY_CLASSES_ROOT;
-	const HKEY regedit::hkey::current_config	= HKEY_CURRENT_CONFIG;
-	const HKEY regedit::hkey::current_user		= HKEY_CURRENT_USER;
-	const HKEY regedit::hkey::local_machine		= HKEY_LOCAL_MACHINE;
-	const HKEY regedit::hkey::users				= HKEY_USERS;
+	const HKEY regedit::hkey::classes_root   = HKEY_CLASSES_ROOT;
+	const HKEY regedit::hkey::current_config = HKEY_CURRENT_CONFIG;
+	const HKEY regedit::hkey::current_user   = HKEY_CURRENT_USER;
+	const HKEY regedit::hkey::local_machine  = HKEY_LOCAL_MACHINE;
+	const HKEY regedit::hkey::users          = HKEY_USERS;
 
 
 }
