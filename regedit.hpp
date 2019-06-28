@@ -15,8 +15,8 @@
 		- Some keys cannot be opened with write permissions
 		- resource_list, full_resource_descriptor and resource_requirements_list types are part of the WDK : https://docs.microsoft.com/en-us/windows-hardware/drivers/download-the-wdk,
 			all these types requires a cast to the expected structure type defined on wdm.h :
-				+ resource_list				 : https://docs.microsoft.com/en-us/windows-hardware/drivers/ddi/content/wdm/ns-wdm-_cm_resource_list
-				+ full_resource_descriptor	 : https://docs.microsoft.com/en-us/windows-hardware/drivers/ddi/content/wdm/ns-wdm-_cm_full_resource_descriptor
+				+ resource_list              : https://docs.microsoft.com/en-us/windows-hardware/drivers/ddi/content/wdm/ns-wdm-_cm_resource_list
+				+ full_resource_descriptor   : https://docs.microsoft.com/en-us/windows-hardware/drivers/ddi/content/wdm/ns-wdm-_cm_full_resource_descriptor
 				+ resoruce_requeriments_list : https://docs.microsoft.com/en-us/windows-hardware/drivers/ddi/content/wdm/ns-wdm-_io_resource_requirements_list
 		- Be careful with what you're going to do, you may make a mess if you edit or delete some keys or values, always make a backup if you want to try 'weird things' : https://support.microsoft.com/en-us/help/322756/how-to-back-up-and-restore-the-registry-in-windows
 */
@@ -50,10 +50,10 @@ namespace neo {
 			public:
 
 				using iterator_category = std::bidirectional_iterator_tag; // random_access_iterator_tag
-				using value_type		= std::pair<const std::string, ValType>;
-				using difference_type	= ptrdiff_t;
-				using pointer			= std::unique_ptr<value_type>;
-				using reference			= value_type; // objects are created on the fly
+				using value_type        = std::pair<const std::string, ValType>;
+				using difference_type   = ptrdiff_t;
+				using pointer           = std::unique_ptr<value_type>;
+				using reference         = value_type; // objects are created on the fly
 
 				iter() {}
 				iter(const iter&) = default;
@@ -380,6 +380,9 @@ namespace neo {
 					void write(const void* data, type ty, DWORD bytes) {
 						RegSetValueExA(_hkey, _name.c_str(), 0, static_cast<DWORD>(ty), reinterpret_cast<const LPBYTE>(const_cast<void*>(data)), bytes);
 					}
+					void write_unicode(const void* data, type ty, DWORD bytes) {
+						RegSetValueExW(_hkey, std::wstring(_name.begin(), _name.end()).c_str(), 0, static_cast<DWORD>(ty), reinterpret_cast<const LPBYTE>(const_cast<void*>(data)), bytes);
+					}
 
 					template<type Ty, typename = typename std::enable_if<Ty == type::none>::type>
 					void write() {
@@ -397,12 +400,12 @@ namespace neo {
 					void write(DWORD val) {
 						write(&val, Ty, sizeof(DWORD));
 					}
-					template<type Ty, typename = typename std::enable_if<Ty == type::link>::type>
+					template<type Ty, typename = typename std::enable_if<Ty == type::sz || Ty == type::expand_sz || Ty == type::link>::type>
 					void write(const std::wstring& val) {
-						write(val.c_str(), Ty, val.size() * 2 + 2);
+						write_unicode(val.c_str(), Ty, val.size() * 2 + 2);
 					}
-					template<type Ty, class InputIterator, typename = typename std::enable_if<Ty == type::multi_sz && std::is_convertible<decltype(*InputIterator()), std::string>::value>::type>
-					void write(InputIterator left, InputIterator right) {
+					template<type Ty, class InputIterator, typename = typename std::enable_if<Ty == type::multi_sz>::type>
+					typename std::enable_if<std::is_convertible<decltype(*InputIterator()), std::string>::value, void>::type  write(InputIterator left, InputIterator right) {
 						std::vector<char> vec;
 						for(InputIterator it = left; it != right; ++it) {
 							for(size_t p = 0; (*it)[p] != '\0'; ++p)
@@ -411,6 +414,17 @@ namespace neo {
 						}
 						vec.push_back('\0');
 						write(vec.data(), Ty, vec.size());
+					}
+					template<type Ty, class InputIterator, typename = typename std::enable_if<Ty == type::multi_sz>::type>
+					typename std::enable_if<std::is_convertible<decltype(*InputIterator()), std::wstring>::value, void>::type write(InputIterator left, InputIterator right) {
+						std::vector<wchar_t> vec;
+						for(InputIterator it = left; it != right; ++it) {
+							for(size_t p = 0; (*it)[p] != L'\0'; ++p)
+								vec.push_back((*it)[p]);
+							vec.push_back(L'\0');
+						}
+						vec.push_back(L'\0');
+						write_unicode(vec.data(), Ty, vec.size() * 2);
 					}
 					template<type Ty, typename = typename std::enable_if<Ty == type::resource_list || Ty == type::full_resource_descriptor || Ty == type::resource_requirements_list>::type>
 					void write(const void* val, size_t bytes) {
