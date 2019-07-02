@@ -193,7 +193,7 @@ namespace neo {
 			template<> _return_t<type::multi_sz>                   /* std::vector<std::string> */ read<type::multi_sz>(HKEY hk, const std::string& name) {
 				DWORD ty = 0, len = 0, off = 0;
 				RegQueryValueExA(hk, name.c_str(), NULL, NULL, NULL, &len);
-				std::unique_ptr<BYTE> ptr; (new BYTE[len]);
+				std::unique_ptr<BYTE> ptr(new BYTE[len]);
 				RegQueryValueExA(hk, name.c_str(), NULL, &ty, ptr.get(), &len);
 
 				std::vector<std::string> vec;
@@ -333,7 +333,7 @@ namespace neo {
 
 			class value {
 
-				public:
+				private:
 
 					HKEY _hkey = NULL;
 					std::string _name;
